@@ -12,3 +12,8 @@ iced = { git = "https://github.com/iced-rs/iced", features = [
 ] }
 iced_runtime = { git = "https://github.com/iced-rs/iced" }
 iced_layershell = { git = "https://github.com/waycrate/exwlshelleventloop", package = "iced_layershell" }
+polkit-agent-rs = "0.3.0"
+glib = "0.20.10"
+futures = "0.3.31"
+
+nix = { version = "0.30.0", features = ["process"] }

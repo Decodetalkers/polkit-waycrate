@@ -4,14 +4,14 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-iced = { git = "https://github.com/iced-rs/iced", features = [
+iced = { version = "0.14.0", features = [
 	"image",
 	"canvas",
 	"advanced",
 	"smol",
 ] }
-iced_runtime = { git = "https://github.com/iced-rs/iced" }
-iced_layershell = { git = "https://github.com/waycrate/exwlshelleventloop", package = "iced_layershell" }
+iced_runtime = "0.14.0"
+iced_layershell = "0.18.0"
 polkit-agent-rs = "0.3.0"
 glib = "0.20.10"
 futures = "0.3.31"

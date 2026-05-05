@@ -8,6 +8,7 @@ use iced::{
     Alignment, Length,
     widget::{Space, column, container, row, text, text_input},
 };
+use iced_layershell::reexport::OutputOption;
 use iced_layershell::settings::LayerShellSettings;
 use iced_layershell::settings::StartMode;
 use iced_layershell::to_layer_message;
@@ -49,7 +50,7 @@ struct PolkitDialog {
     pw_sender: Option<Sender<PasswordMessage>>,
 }
 
-const DIALOG_NAMESPACE: &str = "polkit";
+const DIALOG_NAMESPACE: &str = "osd";
 
 impl PolkitDialog {
     fn new(controller: glib::MainLoop) -> Self {
@@ -78,7 +79,7 @@ fn update(dialog: &mut PolkitDialog, message: Message) -> Task<Message> {
                     exclusive_zone: Some(-1),
                     anchor: Anchor::all(),
                     layer: Layer::Top,
-                    use_last_output: true,
+                    output_option: OutputOption::LastOutput,
                     ..Default::default()
                 },
                 id: iced::window::Id::unique(),
@@ -129,7 +130,7 @@ fn update(dialog: &mut PolkitDialog, message: Message) -> Task<Message> {
     }
 }
 
-fn view(dialog: &PolkitDialog, _id: iced::window::Id) -> Element<Message> {
+fn view(dialog: &PolkitDialog, _id: iced::window::Id) -> Element<'_, Message> {
     container(
         column![
             text_input("Your password", &dialog.password)
@@ -137,12 +138,12 @@ fn view(dialog: &PolkitDialog, _id: iced::window::Id) -> Element<Message> {
                 .secure(true)
                 .on_input(Message::PasswordChange),
             text(&dialog.info_message),
-            text(&dialog.error_message),
+            text(&dialog.error_message).color(iced::color!(0xff0000)),
             row![
                 button("Confirm").on_press(Message::Confirm),
-                Space::with_width(30.),
+                Space::new().width(30.),
                 button("Cancel").on_press(Message::Cancel),
-                Space::with_width(30.),
+                Space::new().width(30.),
                 button("Debug").on_press(Message::Exit)
             ]
         ]

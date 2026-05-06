@@ -1,9 +1,9 @@
-name: Build xdg-desktop-portal-luminous (archlinux)
+name: Build polkit-waycrate (archlinux)
 
 on: [push, pull_request]
 jobs:
   build:
-    name: "Build xdg-desktop-portal-luminous"
+    name: "Build polkit-waycrate"
     runs-on: ubuntu-latest
     container:
       image: archlinux:latest

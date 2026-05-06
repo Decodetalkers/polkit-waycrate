@@ -63,7 +63,7 @@ async fn authenticate(
                         }
                         Err(e) => {
                             let _ = agent.sender.send(Message::PolkitComplete).await;
-                            return Err(Error::FailedReason(format!("Time out: {e}")));
+                            return Err(Error::FailedReason(format!("Timeout: {e}")));
                         }
                     }
                 }
@@ -97,7 +97,7 @@ pub async fn init_agent(
     polkit_agent_instance(
         move || Agent {
             pw_receiver,
-            sender: sender.clone(),
+            sender,
         },
         authenticate,
         cancel_authentication,

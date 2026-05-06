@@ -16,8 +16,6 @@ iced = { version = "0.14.0", features = [
 ] }
 iced_runtime = "0.14.0"
 iced_layershell = "0.18.0"
-polkit-agent-rs = "0.3.0"
-glib = "0.20.10"
 futures = "0.3.31"
 
 nix = { version = "0.30.0", features = ["process"] }

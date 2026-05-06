@@ -23,15 +23,35 @@ struct Agent {
 
 async fn authenticate(
     agent: &mut Agent,
-    _action_id: &str,
+    action_id: &str,
     msg: &str,
-    _icon_name: &str,
+    icon_name: &str,
     _details: HashMap<&str, &str>,
     cookie: &str,
-    mut identifiers: Vec<Identity<'_>>,
+    identifiers: Vec<Identity<'_>>,
 ) -> Result<(), Error> {
-    let identify: UnixUser = identifiers.remove(0).try_into()?;
-    let mut session = PolkitAgentSession::new(identify, cookie)?;
+    let users: Vec<UnixUser> = identifiers
+        .iter()
+        .flat_map(|identify| identify.try_into())
+        .collect();
+    let user_names: Vec<String> = users
+        .iter()
+        .map(|user| nix::unistd::User::from_uid(user.uid.into()))
+        .map(|result| {
+            result
+                .map(|user| user.map(|user| user.name).unwrap_or("Unknown".to_owned()))
+                .unwrap_or("Unknown".to_owned())
+        })
+        .collect();
+    let _ = agent
+        .sender
+        .send(Message::PolkitComing {
+            user_names,
+            action_id: action_id.to_owned(),
+            icon_name: icon_name.to_owned(),
+        })
+        .await;
+    let mut session = PolkitAgentSession::new(users[0], cookie)?;
     let mut retry_count = 3;
     while retry_count >= 0 {
         while !session.is_complete() {
@@ -60,6 +80,9 @@ async fn authenticate(
                         }
                         Ok(PasswordMessage::Canceled) => {
                             return Err(Error::Cancelled);
+                        }
+                        Ok(PasswordMessage::SwitchUser(index)) => {
+                            session.restart_with_uid(users[index])?;
                         }
                         Err(e) => {
                             let _ = agent.sender.send(Message::PolkitComplete).await;

@@ -1,14 +1,14 @@
 mod agent;
+mod icon_theme;
 use futures::SinkExt;
 use iced::Color;
 use iced::Element;
 use iced::Task;
-use iced::widget::button;
 use iced::widget::operation::focus;
 use iced::window::Id;
 use iced::{
     Alignment, Length,
-    widget::{Space, column, container, row, text, text_input},
+    widget::{Space, button, checkbox, column, combo_box, container, row, svg, text, text_input},
 };
 use iced_layershell::reexport::KeyboardInteractivity;
 use iced_layershell::reexport::OutputOption;
@@ -26,11 +26,13 @@ use std::sync::LazyLock;
 use futures::channel::mpsc::{self, Sender};
 
 use crate::agent::init_agent;
+use crate::icon_theme::IconTheme;
 
 static INPUT_ID: LazyLock<iced::widget::Id> = LazyLock::new(iced::widget::Id::unique);
 
 #[derive(Debug, Clone)]
 pub enum PasswordMessage {
+    SwitchUser(usize),
     Password(String),
     Canceled,
 }
@@ -38,10 +40,20 @@ pub enum PasswordMessage {
 #[to_layer_message(multi)]
 #[derive(Debug, Clone)]
 enum Message {
-    PolkitPasswordRequest { prompt: String, message: String },
+    PolkitComing {
+        user_names: Vec<String>,
+        action_id: String,
+        icon_name: String,
+    },
+    PolkitPasswordRequest {
+        prompt: String,
+        message: String,
+    },
     PolkitComplete,
     PolkitError(String),
     PolkitInfo(String),
+    SwitchUser(UserInfo),
+    SwitchInfo(bool),
     Cancel,
     Confirm,
     Opened(Id),
@@ -59,6 +71,24 @@ struct PolkitDialog {
     password: String,
     current_id: Option<Id>,
     pw_sender: Option<Sender<PasswordMessage>>,
+    info_icon: svg::Handle,
+    user_names: combo_box::State<UserInfo>,
+    current_user: Option<UserInfo>,
+    user_count: usize,
+    action_id: String,
+    more_information: bool,
+}
+
+#[derive(Debug, Clone)]
+struct UserInfo {
+    name: String,
+    index: usize,
+}
+
+impl std::fmt::Display for UserInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name)
+    }
 }
 
 const DIALOG_NAMESPACE: &str = "osd";
@@ -73,6 +103,12 @@ impl PolkitDialog {
             password: "".to_owned(),
             current_id: None,
             pw_sender: None,
+            info_icon: svg::Handle::default_icon(),
+            user_names: combo_box::State::new(vec![]),
+            current_user: None,
+            user_count: 0,
+            action_id: "".to_owned(),
+            more_information: false,
         }
     }
 }
@@ -81,6 +117,28 @@ fn update(dialog: &mut PolkitDialog, message: Message) -> Task<Message> {
     use iced::window::Action as WindowAction;
     use iced_runtime::Action;
     match message {
+        Message::PolkitComing {
+            user_names,
+            action_id,
+            icon_name,
+        } => {
+            let users: Vec<UserInfo> = user_names
+                .into_iter()
+                .enumerate()
+                .map(|(index, name)| UserInfo { index, name })
+                .collect();
+            dialog.current_user = Some(users[0].clone());
+            dialog.user_names = combo_box::State::new(users);
+            dialog.info_icon = svg::Handle::from_icon(&icon_name);
+            dialog.action_id = action_id;
+            Task::none()
+        }
+        Message::SwitchUser(UserInfo { index, .. }) => {
+            if let Some(pw_sender) = &mut dialog.pw_sender {
+                let _ = pw_sender.try_send(PasswordMessage::SwitchUser(index));
+            }
+            Task::none()
+        }
         Message::PolkitPasswordRequest { prompt, message } => {
             if dialog.current_id.is_some() {
                 return Task::none();
@@ -135,6 +193,10 @@ fn update(dialog: &mut PolkitDialog, message: Message) -> Task<Message> {
             Task::none()
         }
 
+        Message::SwitchInfo(enable) => {
+            dialog.more_information = enable;
+            Task::none()
+        }
         Message::PasswordChange(password) => {
             dialog.password = password;
             Task::none()
@@ -157,8 +219,55 @@ fn update(dialog: &mut PolkitDialog, message: Message) -> Task<Message> {
 }
 
 fn view(dialog: &PolkitDialog, _id: iced::window::Id) -> Element<'_, Message> {
+    let user_element: Element<'_, Message> = if dialog.user_count == 0
+        && let Some(user) = &dialog.current_user
+    {
+        text(&user.name).size(30).color(iced::color!(766699)).into()
+    } else {
+        combo_box(
+            &dialog.user_names,
+            "select user",
+            dialog.current_user.as_ref(),
+            Message::SwitchUser,
+        )
+        .size(28.)
+        .into()
+    };
+    let info: Element<'_, Message> = if dialog.more_information {
+        column![
+            checkbox(dialog.more_information)
+                .label("extra info")
+                .on_toggle(Message::SwitchInfo),
+            row![
+                Space::new().width(24.),
+                text(&dialog.action_id).color(Color::WHITE).size(15),
+                Space::new().width(Length::Fill)
+            ]
+        ]
+        .spacing(5)
+        .width(Length::Fill)
+        .height(50)
+        .into()
+    } else {
+        container(
+            checkbox(dialog.more_information)
+                .label("extra info")
+                .on_toggle(Message::SwitchInfo)
+                .width(Length::Fill),
+        )
+        .height(50)
+        .into()
+    };
     container(
         column![
+            row![
+                svg(dialog.info_icon.clone()).width(30.).height(30.),
+                container(user_element).align_y(Alignment::Center),
+                Space::new().width(Length::Fill)
+            ]
+            .spacing(7)
+            .width(Length::Fill),
+            Space::new().height(8),
             container(text(&dialog.message).size(25.).color(Color::WHITE)).center_x(Length::Fill),
             Space::new().height(5),
             text_input(&dialog.prompt, &dialog.password)
@@ -168,6 +277,8 @@ fn view(dialog: &PolkitDialog, _id: iced::window::Id) -> Element<'_, Message> {
                 .on_input(Message::PasswordChange),
             text(&dialog.info_message),
             text(&dialog.error_message).color(iced::color!(0xff0000)),
+            info,
+            Space::new().height(10),
             row![
                 button("Confirm").on_press(Message::Confirm),
                 Space::new().width(30.),

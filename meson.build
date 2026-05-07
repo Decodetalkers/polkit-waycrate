@@ -1,7 +1,7 @@
 project(
   'polkit-waycrate',
   'rust',
-  version: '0.1.0',
+  version: '0.1.1',
   meson_version: '>=1.1.0',
 )
 
@@ -31,13 +31,13 @@ endif
 
 prefix = get_option('prefix')
 
-bindir = prefix / get_option('bindir')
+lib_dir = prefix / get_option('libexecdir')
 
 systemd_dir = prefix / get_option('libdir') / 'systemd' / 'user'
 
 global_conf = configuration_data()
 
-global_conf.set('bin_install_dir', bindir)
+global_conf.set('bin_install_dir', lib_dir)
 
 systemd_service_file = configure_file(
   input: './misc/polkit-waycrate-agent.service.in',
@@ -50,7 +50,7 @@ custom_target(
   output: target_name,
   build_by_default: true,
   install: true,
-  install_dir: bindir,
+  install_dir: lib_dir,
   console: true,
   command: command,
 )
